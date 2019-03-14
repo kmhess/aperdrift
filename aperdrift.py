@@ -45,8 +45,9 @@ def main():
 
     calib_name = '3C147'
     drift_cal = SkyCoord.from_name(calib_name)
-    print("Calibrator position is: ", drift_cal.to_string('hmsdms'))
-    print("\t in degrees: ", drift_cal.ra.deg, drift_cal.dec.deg)
+    print("\n##################################################################")
+    print("Calibrator position is: {}".format(drift_cal.to_string('hmsdms')))
+    print("\t in degrees: {} {}".format(drift_cal.ra.deg, drift_cal.dec.deg))
 
     beams = read_beams()
 
@@ -79,35 +80,41 @@ def main():
 
     print('\n Total time (not counting slew): {}'.format(sum(drift_time) + 2. * len(drift_time) * u.min))
 
-    header = ['source', 'ra', 'dec', 'date1', 'time1', 'date2', 'time2', 'int', 'type', 'weight', 'beam', 'switch_type']
+    #header = ['source', 'ra', 'dec', 'date1', 'time1', 'date2', 'time2', 'int', 'type', 'weight', 'beam', 'switch_type']
 
     # with open(csv_filename, 'w') as csvfile:
     #     writer = csv.writer(csvfile)
     #     writer.writerow(header)
+
+    sh = open("3c147_driftscan"+datetime.datetime.now().strftime("%Y%m%d-%H%M")+".sh", "w")
+    #print("test", file=sh)
 
     telescope_position = start_pos[0]
     obstimeUTC = starttimeUTC
     currentLST = Time(obstimeUTC).sidereal_time('apparent', westerbork().lon)
     print("Starting LST is :", currentLST)
 
-    for i in range(len(rows)):
-        slew_seconds = calc_slewtime([telescope_position.ra.radian, telescope_position.dec.radian],
-                                    [start_pos[i].ra.radian, start_pos[i].dec.radian])
+    with open("3c147_driftscan"+datetime.datetime.now().strftime("%m%d-%H%M%S")+".txt", "w") as file:
+        for i in range(len(rows)):
+            slew_seconds = calc_slewtime([telescope_position.ra.radian, telescope_position.dec.radian],
+                                        [start_pos[i].ra.radian, start_pos[i].dec.radian])
 
-        start_obstimeUTC = obstimeUTC + datetime.timedelta(seconds=slew_seconds)
-        currentLST = Time(start_obstimeUTC).sidereal_time('apparent', westerbork().lon)
-        telescope_position_hadec = currentLST - start_pos[i].ra
-        # print("HA? ",telescope_position_hadec)
+            start_obstimeUTC = obstimeUTC + datetime.timedelta(seconds=slew_seconds)
+            currentLST = Time(start_obstimeUTC).sidereal_time('apparent', westerbork().lon)
+            telescope_position_hadec = currentLST - start_pos[i].ra
 
-        end_obstimeUTC = do_drift(start_obstimeUTC,drift_time[i].value)
-            # write_to_csv(csvfile, calib_name, telescope_position, new_obstimeUTC, after_target)
-        print("atdb_service --field_name=3C147_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' --endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_atdb.template --pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD --central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod".
-              format(telescope_position_hadec.deg, start_pos[i].dec.deg, start_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S"), end_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S")))
-        obstimeUTC = end_obstimeUTC
-        telescope_position = start_pos[i]
-         # print("Scan {} observed {}.".format(i, telescope_position))
+            end_obstimeUTC = do_drift(start_obstimeUTC,drift_time[i].value)
+            print("atdb_service --field_name=3C147_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' --endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_atdb.template --pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD --central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod".
+                  format(telescope_position_hadec.deg, start_pos[i].dec.deg, start_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S"), end_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S")))
+            file.write(
+                "atdb_service --field_name=3C147_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' --endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_atdb.template --pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD --central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod\n".
+                format(telescope_position_hadec.deg, start_pos[i].dec.deg,
+                       start_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S"), end_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S")))
+            obstimeUTC = end_obstimeUTC
+            telescope_position = start_pos[i]
 
-    print("Ending observations! UTC: " + str(obstimeUTC))
+    print("\nEnding observations! UTC: " + str(obstimeUTC))
+    print("ATDB commands written to {}".format(file.name))
     print("##################################################################\n")
 
 
