@@ -4,10 +4,10 @@ __author__ = "Kelley M. Hess"
 __date__ = "$07-mar-2019 16:00:00$"
 __version__ = "0.1"
 
-import csv
 import datetime
 
-from astropy.coordinates import Angle, Longitude, SkyCoord
+from argparse import ArgumentParser, RawTextHelpFormatter
+from astropy.coordinates import SkyCoord
 from astropy.table import Table, unique
 from astropy.time import Time
 from astropy import units as u
@@ -26,94 +26,123 @@ def read_beams():
     return beams
 
 
-def do_drift(obstimeUTC,drift_time):
-    return obstimeUTC + datetime.timedelta(minutes=drift_time)
+def do_drift(obstime_utc, drift_time):
+    return obstime_utc + datetime.timedelta(minutes=np.abs(drift_time))
 
+
+def parse_args():
+    # *** THIS IS A WORK IN PROGRESS AND NOT YET IMPLEMENTED: ***
+    parser = ArgumentParser(
+        description="Make a driftscan schedule for the Apertif imaging surveys.",
+        formatter_class=RawTextHelpFormatter)
+
+    parser.add_argument('-d', '--drifts_per_beam', default=1,
+                        help='Specify the number of drifts per beam line. Should be an odd integer. (default: %(default)s).')
+    parser.add_argument('-s', "--starttime_utc", default="2019-03-25 20:00:00",
+                        help="The start time in ** UTC ** ! - format 'YYYY-MM-DD HH:MM:SS' (default: '%(default)s').",
+                        type=datetime.datetime.fromisoformat)
+    parser.add_argument('-o', '--output', default='temp',
+                        help='Specify the root of output csv and png files (default: imaging_sched_%(default)s.csv.)')
+    parser.add_argument('-v', "--verbose",
+                        help="If option is included, print updated UTC times after each scan.",
+                        action='store_true')
+
+    args = parser.parse_args()
+    return args
 ###################################################################
 
 def main():
 
     # User supplied **UTC** start time:
-    starttimeUTC = datetime.datetime(2019, 3, 8, 20, 30, 0)  # Start observing at 5 pm Local (4 UTC) on 01 Mar 2019.
-    endtimeUTC = datetime.datetime(2019, 3, 8, 23, 30, 0)  # Start observing at 5 pm Local (4 UTC) on 01 Mar 2019.
+    starttime_utc = Time('2019-03-16 09:20:00')  # Start observing at 5 pm Local (4 UTC) on 01 Mar 2019.
 
-    # User supplied filename:
-    csv_filename = 'drift_scan_3c147.csv'
+    obstime_utc = starttime_utc
+    current_lst = Time(obstime_utc).sidereal_time('apparent', westerbork().lon)
 
     # User supplied number of rows:
     nrows = 7
 
-    calib_name = '3C147'
+    calib_name = '3C48'
     drift_cal = SkyCoord.from_name(calib_name)
+
     print("\n##################################################################")
     print("Calibrator position is: {}".format(drift_cal.to_string('hmsdms')))
     print("\t in degrees: {} {}".format(drift_cal.ra.deg, drift_cal.dec.deg))
+
+    print("Starting LST is :", current_lst)
+
+    wrap = 0 * u.hourangle
+    if (current_lst-drift_cal.ra).value > 12.0:
+        wrap = 24*u.hourangle
+
+    print("Starting HA of calibrator is: {}".format(current_lst-drift_cal.ra-wrap))
 
     beams = read_beams()
 
     rows = np.array(unique(beams, keys='dDec'))
 
-    declination = []
+    dec_cen = []
+    dec_row = []
     ra_start = []
-    hour_angle_degs = []
-    drift_degs = []
-    drift_ra = []
+    ha_start = []
+    ha_end = []
     drift_time = []
     for i in range(len(rows)):
-        declination.append(drift_cal.dec.deg + rows[i][1])
-        hour_angle_degs.append([np.max(beams[np.where(beams['dDec'] == rows[i][1])]['dHA']),
-                                np.min(beams[np.where(beams['dDec'] == rows[i][1])]['dHA'])])
-        drift_degs.append(1.0 + np.max(beams[np.where(beams['dDec'] == rows[i][1])]['dHA']) -
-                          np.min(beams[np.where(beams['dDec'] == rows[i][1])]['dHA']))
-        drift_ra.append(drift_degs[i] / np.cos(declination[i] * u.deg))
-        drift_time.append(drift_ra[i] * 12. / 180. * 60. * u.min)
-        ra_start.append((drift_cal.ra.deg - (-0.0 + (hour_angle_degs[i][0])) / np.cos(declination[i] * u.deg)))
-        # print(ra_start[i], declination[i], drift_degs[i], drift_ra[i], drift_time[i])
-    start_pos = SkyCoord(ra=np.array(ra_start), dec=declination, unit='deg')
+        dec_cen.append(drift_cal.dec.deg - rows[i][1])
+        dec_row.append(drift_cal.dec.deg + rows[i][1])
+        ha_start.append(np.max(beams[np.where(beams['dDec'] == rows[i][1])]['dHA']))
+        ha_end.append(np.min(beams[np.where(beams['dDec'] == rows[i][1])]['dHA']))
+        ra_start.append(drift_cal.ra.deg + (ha_start[i] + 0.5) / np.cos(dec_row[i] * u.deg))
+        drift_time.append(((ha_end[i] - ha_start[i] - 1.0) / np.cos((dec_row[i]) * u.deg)) * 12. / 180. * 60. * u.min)
+    start_pos = SkyCoord(ra=np.array(ra_start), dec=dec_row, unit='deg')
+    print("Drift time: {}".format(drift_time))
 
-    plt.figure()
+    plt.figure(figsize=(10, 6))
     for i in range(len(rows)):
-        plt.scatter(drift_cal.ra.deg - beams['dHA'] / np.cos(beams['dDec'] * u.deg), drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
-        #plt.scatter(drift_cal.ra.deg - beams['dHA'] + 1, drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='brown')
-        plt.plot([ra_start[i], ra_start[i] + drift_degs[i]], [declination[i], declination[i]])
-    plt.savefig('test.png')
+        plt.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
+        plt.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
+                    drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
+        plt.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
+        plt.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] - 1.0) / np.cos((dec_row[i]) * u.deg)],
+                 [dec_row[i], dec_row[i]])
+        plt.xlim(np.ceil(np.min(ra_start)+1.), np.ceil(np.min(ra_start)-4.))
+    # plt.savefig('3c147_driftscan.png'.format(datetime.datetime.now().strftime("%m%d-%H%M%S")))
+    plt.savefig('3c48_driftscan.png')
 
     print('\n Total time (not counting slew): {}'.format(sum(drift_time) + 2. * len(drift_time) * u.min))
 
-    #header = ['source', 'ra', 'dec', 'date1', 'time1', 'date2', 'time2', 'int', 'type', 'weight', 'beam', 'switch_type']
-
-    # with open(csv_filename, 'w') as csvfile:
-    #     writer = csv.writer(csvfile)
-    #     writer.writerow(header)
-
-    sh = open("3c147_driftscan"+datetime.datetime.now().strftime("%Y%m%d-%H%M")+".sh", "w")
-    #print("test", file=sh)
-
     telescope_position = start_pos[0]
-    obstimeUTC = starttimeUTC
-    currentLST = Time(obstimeUTC).sidereal_time('apparent', westerbork().lon)
-    print("Starting LST is :", currentLST)
+    telescope_position = SkyCoord('15h09m38s 60d41m51s')
 
-    with open("3c147_driftscan"+datetime.datetime.now().strftime("%m%d-%H%M%S")+".txt", "w") as file:
+    with open("3c48_drift" + starttime_utc.strftime("%Y%m%d") + ".sh", "w") as file:
         for i in range(len(rows)):
             slew_seconds = calc_slewtime([telescope_position.ra.radian, telescope_position.dec.radian],
                                         [start_pos[i].ra.radian, start_pos[i].dec.radian])
 
-            start_obstimeUTC = obstimeUTC + datetime.timedelta(seconds=slew_seconds)
-            currentLST = Time(start_obstimeUTC).sidereal_time('apparent', westerbork().lon)
-            telescope_position_hadec = currentLST - start_pos[i].ra
+            start_obstime_utc = obstime_utc + datetime.timedelta(seconds=slew_seconds)
+            current_lst = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
+            telescope_position_hadec = current_lst - start_pos[i].ra - wrap
+            end_obstime_utc = do_drift(start_obstime_utc, drift_time[i].value)
 
-            end_obstimeUTC = do_drift(start_obstimeUTC,drift_time[i].value)
-            print("atdb_service --field_name=3C147_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' --endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_atdb.template --pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD --central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod".
-                  format(telescope_position_hadec.deg, start_pos[i].dec.deg, start_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S"), end_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S")))
+            print("atdb_service --field_name=3C48_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' "
+                  "--endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_driftscan_atdb.template "
+                  "--pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD "
+                  "--central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod".
+                  format(telescope_position_hadec.deg, start_pos[i].dec.deg,
+                         start_obstime_utc.strftime("%Y-%m-%d %H:%M:%S"), end_obstime_utc.strftime("%Y-%m-%d %H:%M:%S")))
             file.write(
-                "atdb_service --field_name=3C147_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' --endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_atdb.template --pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD --central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod\n".
+                "atdb_service --field_name=3C48_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' "
+                "--endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_driftscan_atdb.template "
+                "--pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD "
+                "--central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod\n".
                 format(telescope_position_hadec.deg, start_pos[i].dec.deg,
-                       start_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S"), end_obstimeUTC.strftime("%Y-%m-%d %H:%M:%S")))
-            obstimeUTC = end_obstimeUTC
+                       start_obstime_utc.strftime("%Y-%m-%d %H:%M:%S"), end_obstime_utc.strftime("%Y-%m-%d %H:%M:%S")))
+
+            obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             telescope_position = start_pos[i]
 
-    print("\nEnding observations! UTC: " + str(obstimeUTC))
+    # Subtract the last 2 minutes to write out the end time because we don't care about the delay for the data writer.
+    print("\nEnding observations! UTC: " + str(obstime_utc - datetime.timedelta(minutes=2.0)))
     print("ATDB commands written to {}".format(file.name))
     print("##################################################################\n")
 
