@@ -109,11 +109,11 @@ def main():
 
 # Plot the drift scans:
     fig,ax=plt.subplots(figsize=(9, 6))
+    ax.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
+    ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
+               drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
+    ax.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
     for i in range(len(rows)):
-        ax.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
-        ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
-                    drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
-        ax.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
         ax.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] + 1.0) / np.cos((dec_row[i]) * u.deg)],
                  [dec_cen[i], dec_cen[i]])
     xlims = ax.get_xlim()
