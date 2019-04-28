@@ -12,10 +12,9 @@ modules/__pycache__
 
 # Random stuff
 .idea/
+*.log
+modeling/
 
 # Notebook stuff
 .ipynb_checkpoints/
 *.ipynb
-
-# Old notes
-first_attempt/

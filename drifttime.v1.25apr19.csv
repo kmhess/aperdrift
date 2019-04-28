@@ -1,19 +1,19 @@
-# Tabulated by hand, calculated from version 0.3, 25-apr-19 of aperdrift.py
+# Tabulated by hand, calculated from version 0.4, 28-apr-19 of aperdrift.py
 # Bm00 is drifted through in drifts_per_beam=1,2,4
 calibrator,drifts_per_beam,total_mins
-3C48,1,120
-3C48,2,248
-3C48,3,382
-3C48,4,517
-3C138,1,106
-3C138,2,219
-3C138,3,339
-3C138,4,458
-3C147,1,152
-3C147,2,314
-3C147,3,485
-3C147,4,656
-3C286,1,117
-3C286,2,241
-3C286,3,373
-3C286,4,504
+3C48,1,126
+3C48,2,260
+3C48,3,401
+3C48,4,543
+3C138,1,112
+3C138,2,230
+3C138,3,356
+3C138,4,481
+3C147,1,160
+3C147,2,330
+3C147,3,510
+3C147,4,689
+3C286,1,123
+3C286,2,253
+3C286,3,391
+3C286,4,529

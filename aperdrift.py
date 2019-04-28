@@ -1,8 +1,8 @@
 # aperdrift: Schedule a drift scan on a calibrator
 # K.M.Hess 19/02/2019 (hess@astro.rug.nl)
 __author__ = "Kelley M. Hess"
-__date__ = "$25-apr-2019 16:00:00$"
-__version__ = "0.3"
+__date__ = "$28-apr-2019 16:00:00$"
+__version__ = "0.4"
 
 import datetime
 
@@ -30,7 +30,7 @@ def do_drift(obstime_utc, drift_time):
 
 
 def parse_args():
-    # *** THIS IS A WORK IN PROGRESS AND NOT YET IMPLEMENTED: ***
+
     parser = ArgumentParser(
         description="Make a driftscan schedule for the Apertif imaging surveys.",
         formatter_class=RawTextHelpFormatter)
@@ -44,9 +44,6 @@ def parse_args():
                         type=datetime.datetime.fromisoformat)
     # parser.add_argument('-o', '--output', default='temp',
     #                     help="Specify the root of output csv and png files (default: imaging_sched_%(default)s.csv.)")
-    # parser.add_argument('-l', '--command_line',
-    #                     help="If option is included, create a .sh file to run atdbspec.",
-    #                     action='store_true')
     parser.add_argument('-v', "--verbose",
                         help="If option is included, print time estimate for several drift combos.",
                         action='store_true')
@@ -109,28 +106,28 @@ def main():
                 dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / n * i)
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.5) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.0) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
         for r in r_nozero:
             for i in range(n):
                 dec_row.append(drift_cal.dec.deg + r[1] - (diff) / n * i)
                 dec_cen.append(drift_cal.dec.deg - r[1] + (diff) / n * i)
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == r[1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == r[1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.5) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.0) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
 
         start_pos = SkyCoord(ra=np.array(ra_start), dec=dec_cen, unit='deg')
-        
+
         if args.verbose and (int(args.drifts_per_beam) != n):
             print("Drift time: {}".format([drift_time[i].value for i in range(len(drift_time))]))
             print("Number of drifts/beam (approx): {}.".format(n))
-            print("Total time (not counting slew): {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
+            print("Total time: {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
+
         if (args.verbose and int(args.drifts_per_beam) == n) or (int(args.drifts_per_beam) == n):
-            print("INNNNN")
             print("Drift time: {}".format([drift_time[i].value for i in range(len(drift_time))]))
             print("Number of drifts/beam (approx): {}.".format(n))
-            print("Total time (not counting slew): {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
+            print("Total time: {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
 
             # Plot and save the drifts for the one actually requested:
             fig,ax=plt.subplots(figsize=(9, 6))
@@ -139,8 +136,9 @@ def main():
                    drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
             ax.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
             for i in range(len(dec_cen)):
-                ax.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] + 1.0) / np.cos((dec_row[i]) * u.deg)],
-                         [dec_cen[i], dec_cen[i]])
+                # ax.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] + 1.2) / np.cos((dec_row[i]) * u.deg)],
+                ax.plot([ra_start[i], ra_start[i] + drift_time[i] / u.min / 60. /12. * 180.],
+                        [dec_row[i], dec_row[i]])
             xlims = ax.get_xlim()
             plt.xlim(xlims[1]+0.25,xlims[0]-0.25)
             figfilename = calib_name + '_driftscan.png'
@@ -159,48 +157,18 @@ def main():
                     end_obstime_utc = do_drift(start_obstime_utc, drift_time[i].value)
                     date1, time1 = start_obstime_utc.strftime('%Y-%m-%d'), start_obstime_utc.strftime('%H:%M:%S')
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
-                    csvfile.write('{}_drift,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1400\n'.format(calib_name, telescope_position_hadec.deg,
-                                                                                                    dec_cen[i], date1, time1, date2, time2))
+                    offset = drift_cal.dec.deg - dec_cen[i]
+                    sign = '+' if offset > 0 else ''
+                    csvfile.write('{}{}{:.2f}_drift,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1400\n'.format(calib_name, sign, offset,
+                                                                        telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
-
-    # # Open & prepare SH file to run atdbspec, in format given by V.M. Moss.
-    # if args.command_line:
-    #     print(" *** NOTE THE sh FORMAT FOR ATDBSPEC MIGHT BE DEPRECATED! *** ")
-    #     start_obstime_utc = args.starttime_utc
-    #
-    #     with open(calib_name + "_drift" + args.starttime_utc.strftime("%Y%m%d") + ".sh", "w") as file:
-    #         for i in range(len(rows)):
-    #             current_lst = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
-    #             wrap = 0 * u.hourangle
-    #             if (current_lst - drift_cal.ra).value > 12.0:
-    #                 wrap = 24 * u.hourangle
-    #             telescope_position_hadec = current_lst - start_pos[i].ra - wrap
-    #             end_obstime_utc = do_drift(start_obstime_utc, drift_time[i].value)
-    #
-    #             print("atdb_service --field_name=3C48_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' "
-    #                   "--endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_driftscan_atdb.template "
-    #                   "--pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD "
-    #                   "--central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod".
-    #                   format(telescope_position_hadec.deg, dec_cen[i],
-    #                          start_obstime_utc.strftime("%Y-%m-%d %H:%M:%S"), end_obstime_utc.strftime("%Y-%m-%d %H:%M:%S")))
-    #             file.write(
-    #                 "atdb_service --field_name=3C48_drift --field_ha={:.6f} --field_dec={:.6f} --starttime='{}' "
-    #                 "--endtime='{}' --parset_only --parset_location=/home/apertif/hess/parset_start_observation_driftscan_atdb.template "
-    #                 "--pattern=square_39p1 --observing_mode=imaging --integration_factor=10 --telescopes=2345679ABCD "
-    #                 "--central_frequency=1400 --data_dir=/data/apertif/ --operation=specification --atdb_host=prod\n".
-    #                 format(telescope_position_hadec.deg, dec_cen[i],
-    #                        start_obstime_utc.strftime("%Y-%m-%d %H:%M:%S"), end_obstime_utc.strftime("%Y-%m-%d %H:%M:%S")))
-    #
-    #             start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
 
     # Don't add the last 2 minutes to write out the end time because we don't care about the delay for the data writer.
     print("Assuming {} drifts, ending observations! UTC: {}".format(args.drifts_per_beam,end_obstime_utc))
 
     print("CSV file written to {}".format(csvfile.name))
     print("PNG file written to {}".format(figfilename))
-    # if args.command_line:
-    #     print("ATDB commands written to {}".format(file.name))
     print("##################################################################\n")
 
 
