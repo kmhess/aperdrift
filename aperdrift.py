@@ -2,7 +2,7 @@
 # K.M.Hess 19/02/2019 (hess@astro.rug.nl)
 __author__ = "Kelley M. Hess"
 __date__ = "$28-apr-2019 16:00:00$"
-__version__ = "0.4"
+__version__ = "0.4.1"
 
 import datetime
 
@@ -21,7 +21,7 @@ from modules.telescope_params import westerbork
 # Define some specific functions for drift scans
 
 def read_beams():
-    beams = Table.read('pattern39+1.txt', format='ascii')
+    beams = Table.read('ancillary/pattern39+1.txt', format='ascii')
     return beams
 
 
@@ -157,9 +157,9 @@ def main():
                     end_obstime_utc = do_drift(start_obstime_utc, drift_time[i].value)
                     date1, time1 = start_obstime_utc.strftime('%Y-%m-%d'), start_obstime_utc.strftime('%H:%M:%S')
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
-                    offset = drift_cal.dec.deg - dec_cen[i]
-                    sign = '+' if offset > 0 else ''
-                    csvfile.write('{}{}{:.2f}_drift,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1400\n'.format(calib_name, sign, offset,
+                    offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
+                    sign = '+' if int(offset) >= 0 else ''
+                    csvfile.write('{}drift{}{:02},{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1400\n'.format(calib_name, sign, int(offset),
                                                                         telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
