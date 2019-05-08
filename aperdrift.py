@@ -7,9 +7,9 @@ __version__ = "0.4.1"
 import datetime
 
 from argparse import ArgumentParser, RawTextHelpFormatter
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, FK5
 from astropy.table import Table, unique
-from astropy.time import Time
+from astropy.time import Time,TimeDecimalYear
 from astropy import units as u
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,14 +36,14 @@ def parse_args():
         formatter_class=RawTextHelpFormatter)
 
     parser.add_argument('-d', '--drifts_per_beam', default=1,
-                        help='Specify the number of drifts per beam line. 1 & even numbers drift through bm00 (default: %(default)s).')
+                        help='Specify the number of drifts per beam line (default: %(default)s).\n 1 & even numbers drift through bm00.')
     parser.add_argument('-c', '--calib', default='3C147',
                         help='Specify the calibrator. (default: %(default)s).')
     parser.add_argument('-s', "--starttime_utc", default="2019-04-25 16:00:00", #"2019-04-25 07:35:00",
                         help="The start time in ** UTC ** ! - format 'YYYY-MM-DD HH:MM:SS' (default: '%(default)s').",
                         type=datetime.datetime.fromisoformat)
-    # parser.add_argument('-o', '--output', default='temp',
-    #                     help="Specify the root of output csv and png files (default: imaging_sched_%(default)s.csv.)")
+    parser.add_argument('-o', '--output', default='_temp',
+                        help="Specify the root of output csv and png files (default: CALname_driftDATE%(default)s.csv.)")
     parser.add_argument('-v', "--verbose",
                         help="If option is included, print time estimate for several drift combos.",
                         action='store_true')
@@ -64,9 +64,13 @@ def main():
     calib_name = args.calib
     drift_cal = SkyCoord.from_name(calib_name)
 
+    # Convert to apparent coordinates for setting up the observations
+    test = drift_cal.transform_to('fk5')
+    drift_cal = test.transform_to(FK5(equinox='J'+str(Time(start_obstime_utc).decimalyear)))
+
     print("\n##################################################################")
     print("Calibrator is: {}".format(calib_name))
-    print("Calibrator position is: {}".format(drift_cal.to_string('hmsdms')))
+    print("Calibrator position is: {} in J{:7.2f} coordinates".format(drift_cal.to_string('hmsdms'), Time(start_obstime_utc).decimalyear))
     print("\t in degrees: {} {}".format(drift_cal.ra.deg, drift_cal.dec.deg))
 
     print("Starting LST is :", current_lst)
@@ -104,6 +108,7 @@ def main():
             for i in range(n - 1, 0, -1):
                 dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / n * i)
                 dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / n * i)
+                # Drift starts at high RA, low HA
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
@@ -146,7 +151,7 @@ def main():
 
             # Open & prepare CSV file to write parset parameters to, in format given by V.M. Moss.
             # Don't worry about slew time because 2 minute wait will always be longer.
-            with open(calib_name + "_drift" + args.starttime_utc.strftime("%Y%m%d") + ".csv", "w") as csvfile:
+            with open(calib_name + "_drift" + args.starttime_utc.strftime("%Y%m%d") + args.output + ".csv", "w") as csvfile:
                 csvfile.write('source,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq\n')
                 for i in range(len(dec_cen)):
                     current_lst = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
