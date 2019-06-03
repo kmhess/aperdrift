@@ -78,6 +78,8 @@ def main():
     wrap = 0 * u.hourangle
     if (current_lst-drift_cal.ra).value > 12.0:
         wrap = 24 * u.hourangle
+    if (current_lst-drift_cal.ra).value < -12.0:
+        wrap = -24 * u.hourangle
 
     print("Starting HA of calibrator is: {}".format(current_lst-drift_cal.ra-wrap))
     if np.abs((current_lst-drift_cal.ra-wrap).hourangle) > 5.:
@@ -146,25 +148,27 @@ def main():
                         [dec_row[i], dec_row[i]])
             xlims = ax.get_xlim()
             plt.xlim(xlims[1]+0.25,xlims[0]-0.25)
-            figfilename = calib_name + '_driftscan.png'
+            figfilename = calib_name.replace(' ', '') + '_driftscan.png'
             plt.savefig(figfilename)
 
             # Open & prepare CSV file to write parset parameters to, in format given by V.M. Moss.
             # Don't worry about slew time because 2 minute wait will always be longer.
-            with open(calib_name + "_drift" + args.starttime_utc.strftime("%Y%m%d") + args.output + ".csv", "w") as csvfile:
+            with open(calib_name.replace(' ','') + "_drift" + args.starttime_utc.strftime("%Y%m%d") + args.output + ".csv", "w") as csvfile:
                 csvfile.write('source,ra,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq\n')
                 for i in range(len(dec_cen)):
-                    current_lst = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
+                    sidereal_t = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
                     wrap = 0 * u.hourangle
-                    if (current_lst - drift_cal.ra).value > 12.0:
+                    if (sidereal_t - drift_cal.ra).value > 12.0 :
                         wrap = 24 * u.hourangle
-                    telescope_position_hadec = current_lst - start_pos[i].ra - wrap
+                    if (sidereal_t - drift_cal.ra).value < -12.0 :
+                        wrap = -24 * u.hourangle
+                    telescope_position_hadec = sidereal_t - start_pos[i].ra - wrap
                     end_obstime_utc = do_drift(start_obstime_utc, drift_time[i].value)
                     date1, time1 = start_obstime_utc.strftime('%Y-%m-%d'), start_obstime_utc.strftime('%H:%M:%S')
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
                     offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
                     sign = '+' if int(offset) >= 0 else ''
-                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1370\n'.format(calib_name, sign, int(offset),
+                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1370\n'.format(calib_name.replace(' ',''), sign, int(offset),
                                                                         telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
