@@ -2,7 +2,7 @@
 # K.M.Hess 19/02/2019 (hess@astro.rug.nl)
 __author__ = "Kelley M. Hess"
 __date__ = "$04-jun-2019 16:00:00$"
-__version__ = "0.1"
+__version__ = "0.2"
 
 from glob import glob
 import os
@@ -14,6 +14,7 @@ from astropy.time import Time
 from astropy.table import Table
 import astropy.units as u
 from astropy.wcs import WCS
+import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
@@ -102,9 +103,9 @@ def main():
 
             x = np.append(x, dHAphys.deg)
             y = np.append(y, np.full(len(dHAphys.deg), hadec_start[beam].dec.deg))
-            z_xx = np.append(z_xx, data['auto_corr_beam_' + str(beam) + '_xx'] / np.median(
+            z_xx = np.append(z_xx, data['auto_corr_beam_' + str(beam) + '_xx'] - np.median(
                 data['auto_corr_beam_' + str(beam) + '_xx']))
-            z_yy = np.append(z_yy, data['auto_corr_beam_' + str(beam) + '_yy'] / np.median(
+            z_yy = np.append(z_yy, data['auto_corr_beam_' + str(beam) + '_yy'] - np.median(
                 data['auto_corr_beam_' + str(beam) + '_yy']))
 
         # # Add a fake drift that goes to zero power at 1 deg above last scan
@@ -124,20 +125,16 @@ def main():
         tx = np.arange(min(x), max(x), cell_size)
         ty = np.arange(min(y), max(y), cell_size)
         XI, YI = np.meshgrid(tx, ty)
-        gridcubx = interpolate.griddata((x, y), z_xx, (XI, YI), method='cubic')
-        zero_gridcubx = gridcubx - np.nanmedian(gridcubx)
+        gridcubx = interpolate.griddata((x, y), z_xx, (XI, YI), method='cubic')  # median already subtracted
         gridcuby = interpolate.griddata((x, y), z_yy, (XI, YI), method='cubic')
-        zero_gridcuby = gridcuby - np.nanmedian(gridcuby)
 
         # Find the reference pixel at the apparent coordinates of the calibrator
         ref_pixy = (calibnow.dec.deg - min(y)) / cell_size
         ref_pixx = (-min(x)) / cell_size
 
         # Find the peak of the primary beam to normalize
-        norm_xx = np.max(gridcubx[int(ref_pixy)-3:int(ref_pixy)+4,int(ref_pixx)-3:int(ref_pixx)+4])
+        norm_xx = np.max(gridcubx[int(ref_pixy)-3:int(ref_pixy)+4, int(ref_pixx)-3:int(ref_pixx)+4])
         norm_yy = np.max(gridcuby[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
-        zero_norm_xx = np.max(zero_gridcubx[int(ref_pixy)-3:int(ref_pixy)+4,int(ref_pixx)-3:int(ref_pixx)+4])
-        zero_norm_yy = np.max(zero_gridcuby[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
         if beam == 0:
             norm0_xx = np.max(gridcubx[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
             norm0_yy = np.max(gridcuby[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
@@ -145,8 +142,8 @@ def main():
         # Convert to decibels
         db_xx = np.log10(gridcubx/norm_xx) * 10.
         db_yy = np.log10(gridcuby/norm_yy) * 10.
-        db0_xx = np.log10(gridcubx/norm0_xx) * 10.
-        db0_yy = np.log10(gridcuby/norm0_yy) * 10.
+        # db0_xx = np.log10(gridcubx/norm0_xx) * 10.
+        # db0_yy = np.log10(gridcuby/norm0_yy) * 10.
 
         wcs = WCS(naxis=2)
         wcs.wcs.cdelt = np.array([-cell_size, cell_size])
@@ -155,16 +152,22 @@ def main():
         wcs.wcs.crpix = [ref_pixx, ref_pixy]
         header = wcs.to_header()
 
-        hdux = fits.PrimaryHDU(db_xx, header=header)
-        hduy = fits.PrimaryHDU(db_yy, header=header)
+        hdux_db = fits.PrimaryHDU(db_xx, header=header)
+        hduy_db = fits.PrimaryHDU(db_yy, header=header)
+        hdux = fits.PrimaryHDU(gridcubx/norm_xx, header=header)
+        hduy = fits.PrimaryHDU(gridcuby/norm_yy, header=header)
         # hdulx = fits.HDUList([hdux])
         # hduly = fits.HDUList([hduy])
 
         # Save the FITS files
-        hdux.writeto(args.root + '{}_{}_{:02}xx.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3], beam),
-                     overwrite=True)
-        hduy.writeto(args.root + '{}_{}_{:02}yy.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3], beam),
-                     overwrite=True)
+        hdux_db.writeto(args.root + '{}_{}_{:02}xx_db.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                                   beam), overwrite=True)
+        hduy_db.writeto(args.root + '{}_{}_{:02}yy_db.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                                   beam), overwrite=True)
+        hdux.writeto(args.root + '{}_{}_{:02}xx.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                             beam), overwrite=True)
+        hduy.writeto(args.root + '{}_{}_{:02}yy.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                             beam), overwrite=True)
 
         fig1 = plt.figure(figsize=(6, 9))
         ax1 = fig1.add_subplot(2, 1, 1, projection=wcs.celestial)
@@ -172,22 +175,20 @@ def main():
         ax1.set_title("Beam {:02} - XX Correlation - Cubic".format(beam))
         ax1.set_ylabel("Declination [J2000]")
         ax1.set_xlabel("Right Ascension [J2000]")
-        # im1 = ax1.imshow(gridcubx, norm=colors.LogNorm(vmin=0.93, vmax=1.2), cmap='magma', animated=True)
-        im1 = ax1.imshow(db0_xx, cmap='magma', vmax=-4.5, vmin=-6.3)
+        im1 = ax1.imshow(gridcubx/norm0_xx, vmax=0.10, vmin=-0.03, cmap='magma', animated=True)
         ax2 = fig1.add_subplot(2, 1, 2, projection=wcs.celestial)
         ax2.grid(lw=1, color='white')
         ax2.set_title("Beam {:02} - YY Correlation - Cubic".format(beam))
         ax2.set_ylabel("Declination [J2000]")
         ax2.set_xlabel("Right Ascension [J2000]")
-        # im2 = ax2.imshow(gridcuby, norm=colors.LogNorm(vmin=0.93, vmax=1.2), cmap='magma', animated=True)
-        im2 = ax2.imshow(db0_yy, cmap='magma', vmax=-4.5, vmin=-6.3)
+        im2 = ax2.imshow(gridcuby/norm0_yy, vmax=0.10, vmin=-0.03, cmap='magma', animated=True)
         corr_im.append([im1, im2])
         plt.savefig(args.root + '{}_{}_{:02}db0_reconstructed.png'.format(args.calibname.replace(" ", ""),
-                                                                       args.taskid, beam))
+                                                                          args.taskid, beam))
         plt.close('all')
 
         # Plot the difference between XX and YY for every beam
-        diffcub = zero_gridcubx/zero_norm_xx - zero_gridcuby/zero_norm_yy
+        diffcub = gridcubx/norm_xx - gridcuby/norm_yy
 
         fig2 = plt.figure(figsize=(10, 9))
         ax1 = fig2.add_subplot(1, 1, 1, projection=wcs.celestial)
@@ -205,6 +206,7 @@ def main():
 
     if args.make_gifs:
         make_gifs(args.root)
+
 
 if __name__ == '__main__':
     main()

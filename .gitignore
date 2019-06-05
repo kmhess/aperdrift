@@ -19,6 +19,7 @@ modeling/*fits
 modeling/*last
 modeling/*im
 modeling/helper_script.py
+modeling/.DS_Store
 *.fits
 observed/
 
