@@ -39,36 +39,34 @@ def extract_data(antennas, beams, channel_range, exclude, args):
 
     for j in beams:
         t = pt.taql(
-            'select TIME, gmeans(means(abs(DATA[' + channel_range + ',0]),0)) as XXPOL, gmeans(means(abs(DATA[5000:20000,3]),0)) as YYPOL from ' + str(
-                args.data_location) + str(args.task_id) + '/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 {} GROUP BY TIME'.format(args.task_id, j, exclude))
-        # t = pt.taql('select TIME, gmeans(means(abs(DATA[{},0]),0)) as XXPOL, gmeans(means(abs(DATA[5000:20000,3]),0))' +
-        #             ' as YYPOL from {}{}/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 {}' +
-        #             ' GROUP BY TIME'.format(channel_range, args.data_location, args.task_id, args.task_id, j, exclude))
+            'select TIME, gmeans(abs(DATA[5000:20000,0])) as XXPOL, gmeans(abs(DATA[5000:20000,3])) as YYPOL from ' +
+            '{}{}/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 {} GROUP BY TIME'.format(
+                args.data_location, args.task_id,args.task_id, j, exclude))
+        print('BEAM: {} shape {}'.format(j, np.array(pt.tablecolumn(t, 'YYPOL')).shape))
         times = np.array(pt.tablecolumn(t, 'TIME'))
-        data_beam_xx = np.array(pt.tablecolumn(t, 'XXPOL'))
-        auto_corr_xx = np.reshape(data_beam_xx, len(data_beam_xx))
-        data_beam_yy = np.array(pt.tablecolumn(t, 'YYPOL'))
-        auto_corr_yy = np.reshape(data_beam_yy, len(data_beam_yy))
         df['time'] = times
-        df['auto_corr_beam_' + str(j) + '_xx'] = auto_corr_xx
-        df['auto_corr_beam_' + str(j) + '_yy'] = auto_corr_yy
-        # df = pd.DataFrame.from_dict({'time':times, 'auto_corr_beam_'+str(j):auto_corr})
+        for k, chan in enumerate(channel_range):
+            data_beam_xx = np.mean(np.array(pt.tablecolumn(t, 'XXPOL'))[:, chan[0]:chan[1], :], axis=1)
+            auto_corr_xx = np.reshape(data_beam_xx, len(data_beam_xx))
+            data_beam_yy = np.mean(np.array(pt.tablecolumn(t, 'YYPOL'))[:, chan[0]:chan[1], :], axis=1)
+            auto_corr_yy = np.reshape(data_beam_yy, len(data_beam_yy))
+            df['auto_corr_beam_' + str(j) + '_freq_' + str(k) + '_xx'] = auto_corr_xx
+            df['auto_corr_beam_' + str(j) + '_freq_' + str(k) + '_yy'] = auto_corr_yy
 
-        for i in antennas:
+        for i in antennas[:-1]:
             t_ant = pt.taql(
-                'select TIME, means(abs(DATA[' + channel_range + ',0]),0) as XXPOL, means(abs(DATA[5000:20000,3]),0) as YYPOL from ' + str(
-                    args.data_location) + str(args.task_id) + '/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 AND ANTENNA1={} GROUP BY TIME'.format(args.task_id, j, i))
-            # t_ant = pt.taql(
-            #     'select TIME, means(abs(DATA[{},0]),0) as XXPOL, means(abs(DATA[5000:20000,3]),0) as' +
-            #     ' YYPOL from {}{}/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 AND ANTENNA1={}' +
-            #     ' GROUP BY TIME'.format(channel_range, args.data_location, args.task_id, args.task_id, j, i))
-            data_ant_xx = np.array(pt.tablecolumn(t_ant, 'XXPOL'))
-            data_ant_yy = np.array(pt.tablecolumn(t_ant, 'YYPOL'))
-            auto_corr_xx_ant = np.reshape(data_ant_xx, len(data_ant_xx))
-            auto_corr_yy_ant = np.reshape(data_ant_yy, len(data_ant_yy))
+                'select TIME, abs(DATA[5000:20000,0]) as XXPOL, abs(DATA[5000:20000,3]) as YYPOL from ' +
+                '{}{}/WSRTA{}_B0{:02}.MS where ANTENNA1==ANTENNA2 AND ANTENNA1={} GROUP BY TIME'.format(
+                    args.data_location, args.task_id, args.task_id, j, i))
+            print('ANT: {} shape {}'.format(i,np.array(pt.tablecolumn(t_ant, 'YYPOL')).shape))
 
-            df['auto_corr_beam_' + str(j) + '_xx_antenna_' + str(i)] = auto_corr_xx_ant
-            df['auto_corr_beam_' + str(j) + '_yy_antenna_' + str(i)] = auto_corr_yy_ant
+            for k,chan in enumerate(channel_range):
+                data_ant_xx = np.mean(np.array(pt.tablecolumn(t_ant, 'XXPOL'))[:, chan[0]:chan[1], :], axis=1)
+                auto_corr_xx_ant = np.reshape(data_ant_xx, len(data_ant_xx))
+                data_ant_yy = np.mean(np.array(pt.tablecolumn(t_ant, 'YYPOL'))[:, chan[0]:chan[1], :], axis=1)
+                auto_corr_yy_ant = np.reshape(data_ant_yy, len(data_ant_yy))
+                df['auto_corr_beam_' + str(j) + '_freq_' + str(k) + '_xx_antenna_' + str(i)] = auto_corr_xx_ant
+                df['auto_corr_beam_' + str(j) + '_freq_' + str(k) + '_yy_antenna_' + str(i)] = auto_corr_yy_ant
 
     return df
 
@@ -99,6 +97,8 @@ def parse_args():
 def main():
 
     args = parse_args()
+    if args.data_location[-1] != '/':
+        args.data_location += '/'
     output_path = args.data_location + args.task_id +'/'
 
     if not os.path.exists(output_path):
@@ -128,18 +128,15 @@ def main():
     # Extract data and export data into a csv file
 
     antennas = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    exclude = ''  # to exclude bad antennas
+    exclude = 'AND ANTENNA1!= 11 AND ANTENNA2!=11'  # to exclude bad antennas
     # exclude = 'AND ANTENNA1!= 11 AND ANTENNA2!=11 AND ANTENNA1!= 10 AND ANTENNA2!=10'
     # channel_range = ['5000:20000'] #RFI free channel range (more or less)
     channel_range = []
-    for i in range(5000, 20000, 1500):
-        channel_range.append(str(i) + ':' + str(i + 1500))
+    for i in range(0, 15000, 1500):
+        channel_range.append([i, i + 1500])
 
-    for i in range(len(channel_range)):
-        print('Extracting data for bin: ', i)
-        df_1 = extract_data(antennas, beams, channel_range[i], exclude, args)
-
-        df_1.to_csv(str(output_path) + str(args.task_id) + '_' + str(i) + '_exported_data.csv')
+    df_1 = extract_data(antennas, beams, channel_range, exclude, args)
+    df_1.to_csv(str(output_path) + str(args.task_id) + '_exported_data_frequency_split.csv')
 
     # # to get antenna names from a measurment set
     # taql_antnames = "SELECT NAME FROM {0}::ANTENNA".format(

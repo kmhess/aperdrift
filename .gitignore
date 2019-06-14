@@ -11,6 +11,7 @@ modules/__pycache__
 *.txt
 
 # Random stuff
+.DS_Store
 .idea/
 *.log
 modeling/*/

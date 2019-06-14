@@ -94,8 +94,10 @@ def main():
 
     print("Starting observations! UTC: {}".format(args.starttime_utc))
 
-    # Calculate the starting position of the beams and the length of the drift:
+    # Calculate the starting position of the beams and the length of the drift
+    # (Do for multiple options which will print if ags.verbose = True):
     for n in range(1,5):
+        # Only include explicit drift through beam 0 if only drifting through peak.
         if n > 1:
             r_nozero = np.delete(rows, 3)
         else:
@@ -106,23 +108,35 @@ def main():
         ha_start = []
         ha_end = []
         drift_time = []
+        # Add drifts at the start
         if n > 1:
-            for i in range(n - 1, 0, -1):
-                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / n * i)
-                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / n * i)
+            for i in range(n + 0, 0, -1):  # changed from n-1
+                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n-1) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n-1) * i)
                 # Drift starts at high RA, low HA
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
-        for r in r_nozero:
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.75) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.5) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+        # Do drifts for all the beams
+        for r in r_nozero[:-1]:
             for i in range(n):
                 dec_row.append(drift_cal.dec.deg + r[1] - (diff) / n * i)
                 dec_cen.append(drift_cal.dec.deg - r[1] + (diff) / n * i)
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == r[1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == r[1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.9) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+        # Add drifts at the end
+        if n > 1:
+            for i in range(0, n+1):  # changed from n-1
+                dec_row.append(drift_cal.dec.deg + rows[-1][1] - (diff) / (n-1) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[-1][1] + (diff) / (n-1) * i)
+                # Drift starts at high RA, low HA
+                ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
+                ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.75) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.5) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
 
         start_pos = SkyCoord(ra=np.array(ra_start), dec=dec_cen, unit='deg')
 
