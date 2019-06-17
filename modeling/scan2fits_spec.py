@@ -13,13 +13,12 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.table import Table
 import astropy.units as u
-from astropy.wcs import WCS, Wcsprm
-# import matplotlib.colors as colors
-# import matplotlib.pyplot as plt
+from astropy.wcs import WCS
 import numpy as np
 from scipy import interpolate
 
 from modules.telescope_params import westerbork
+
 
 def taskid2equinox(taskid):
 
@@ -52,9 +51,9 @@ def parse_args():
                         help="The first taskid in the set. (default: '%(default)s').")
     parser.add_argument('-o', '--root', default='/Users/hess/apertif/scheduling/aperdrift/modeling/CygA_190531/',
                         help="Specify the root directory. \n(default: '%(default)s').")
-    parser.add_argument('-g', '--make_gifs',
-                        help="(Re)Make gifs of figures? (default is False).",
-                        action='store_true')
+    # parser.add_argument('-g', '--make_gifs',
+    #                     help="(Re)Make gifs of figures? (default is False).",
+    #                     action='store_true')
     # parser.add_argument('-v', "--verbose",
     #                     help="If option is included, print time estimate for several drift combos.",
     #                     action='store_true')
@@ -72,11 +71,11 @@ def main():
     # Find calibrator position
     calib = SkyCoord.from_name(args.calibname)
 
-    cell_size = 105. / 3600.
+    cell_size = 100. / 3600.
     freqchunks = 10
 
     # Put all the output from drift_scan_auto_corr.ipynb in a unique folder per source, per set of drift scans.
-    datafiles = glob(args.root + '*_*_exported_data.csv')
+    datafiles = glob(args.root + '*_exported_data_frequency_split.csv')
     datafiles.sort()
     posfiles = glob(args.root + '*hadec.csv')
     posfiles.sort()
@@ -85,18 +84,22 @@ def main():
     test = calib.transform_to('fk5')
     calibnow = test.transform_to(FK5(equinox='J{}'.format(taskid2equinox(args.taskid))))
 
-    for beam in range(15, 20):
+    # Read data once and be smart about how we search it.
+    data_tab, hadec_tab = [], []
+    print("\nReading in all the data...")
+    for file, pos in zip(datafiles, posfiles):
+        data_tab.append(Table.read(file, format='csv'))  # list of tables
+        hadec_tab.append(Table.read(pos, format='csv'))  # list of tables
+
+    print("Making beam maps: ", end=' ')
+    for beam in range(0, 40):
         print(beam, end=' ')
 
-        # Create the vectors which contain all data from all scans for a given beam which has been specified above.
-        # cube_xx, cube_y, db_xx, db_yy = [], [], [], []
         for f in range(freqchunks):
             x, y, z_xx, z_yy = [], [], [], []
-            for file, pos in zip(datafiles[f::10], posfiles):
-                data = Table.read(file, format='csv')
-                hadec = Table.read(pos, format='csv')
-                hadec_start = SkyCoord(ra=hadec['ha'], dec=hadec['dec'], unit=(u.rad, u.rad))  # From ALTA (same as above)
 
+            for data, hadec in zip(data_tab, hadec_tab):
+                hadec_start = SkyCoord(ra=hadec['ha'], dec=hadec['dec'], unit=(u.rad, u.rad))
                 time_mjd = Time(data['time'] / (3600 * 24), format='mjd')
                 lst = time_mjd.sidereal_time('apparent', westerbork().lon)
 
@@ -107,10 +110,10 @@ def main():
 
                 x = np.append(x, dHAphys.deg)
                 y = np.append(y, np.full(len(dHAphys.deg), hadec_start[beam].dec.deg))
-                z_xx = np.append(z_xx, data['auto_corr_beam_' + str(beam) + '_xx'] - np.median(
-                    data['auto_corr_beam_' + str(beam) + '_xx']))
-                z_yy = np.append(z_yy, data['auto_corr_beam_' + str(beam) + '_yy'] - np.median(
-                    data['auto_corr_beam_' + str(beam) + '_yy']))
+                z_xx = np.append(z_xx, data['auto_corr_beam_{}_freq_{}_xx'.format(beam, f)] - np.median(
+                    data['auto_corr_beam_{}_freq_{}_xx'.format(beam, f)]))
+                z_yy = np.append(z_yy, data['auto_corr_beam_{}_freq_{}_yy'.format(beam, f)] - np.median(
+                    data['auto_corr_beam_{}_freq_{}_yy'.format(beam, f)]))
 
             # Create the 2D plane, do a cubic interpolation, and append it to the cube.
             tx = np.arange(min(x), max(x), cell_size)
@@ -120,12 +123,12 @@ def main():
             gridcuby = interpolate.griddata((x, y), z_yy, (XI, YI), method='cubic')
 
             # Find the reference pixel at the apparent coordinates of the calibrator
-            ref_pixy = (calibnow.dec.deg - min(y)) / cell_size
-            ref_pixx = (-min(x)) / cell_size
-            # ref_pixz =
+            ref_pixy = (calibnow.dec.deg - min(y)) / cell_size + 1      # FITS indexed from 1
+            ref_pixx = (-min(x)) / cell_size + 1                        # FITS indexed from 1
+            ref_pixz = 1                                                # FITS indexed from 1
 
             # Find the peak of the primary beam to normalize
-            norm_xx = np.max(gridcubx[int(ref_pixy)-3:int(ref_pixy)+4, int(ref_pixx)-3:int(ref_pixx)+4])
+            norm_xx = np.max(gridcubx[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
             norm_yy = np.max(gridcuby[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
             # if beam == 0:
             #     norm0_xx = np.max(gridcubx[int(ref_pixy) - 3:int(ref_pixy) + 4, int(ref_pixx) - 3:int(ref_pixx) + 4])
@@ -145,29 +148,40 @@ def main():
             db_xx[f, :, :] = np.log10(gridcubx/norm_xx) * 10.
             db_yy[f, :, :] = np.log10(gridcuby/norm_yy) * 10.
 
+        stokesI = np.sqrt(0.5 * cube_yy**2 + 0.5 * cube_xx**2)
+        squint = cube_xx - cube_yy
+
         wcs = WCS(naxis=3)
         wcs.wcs.cdelt = np.array([-cell_size, cell_size, 12.207e3*1500])
         wcs.wcs.ctype = ['RA---TAN', 'DEC--TAN', 'FREQ']
         wcs.wcs.crval = [calib.ra.to_value(u.deg), calib.dec.to_value(u.deg), 1219.609e6+(12.207e3*(500+1500/2))]
-        wcs.wcs.crpix = [ref_pixx, ref_pixy, 1]
+        wcs.wcs.crpix = [ref_pixx, ref_pixy, ref_pixz]
         wcs.wcs.specsys = 'TOPOCENT'
         wcs.wcs.restfrq = 1.420405752e+9
         header = wcs.to_header()
 
-        hdux_db = fits.PrimaryHDU(db_xx, header=header)
-        hduy_db = fits.PrimaryHDU(db_yy, header=header)
+        # hdux_db = fits.PrimaryHDU(db_xx, header=header)
+        # hduy_db = fits.PrimaryHDU(db_yy, header=header)
         hdux = fits.PrimaryHDU(cube_xx, header=header)
         hduy = fits.PrimaryHDU(cube_yy, header=header)
+        hduI = fits.PrimaryHDU(stokesI, header=header)
+        hdusq = fits.PrimaryHDU(squint, header=header)
 
         # Save the FITS files
-        hdux_db.writeto(args.root + '{}_{}_{:02}xx_db_cube.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
-                                                                        beam), overwrite=True)
-        hduy_db.writeto(args.root + '{}_{}_{:02}yy_db_cube.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
-                                                                        beam), overwrite=True)
-        hdux.writeto(args.root + '{}_{}_{:02}xx_cube.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
-                                                                  beam), overwrite=True)
-        hduy.writeto(args.root + '{}_{}_{:02}yy_cube.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
-                                                                  beam), overwrite=True)
+        # hdux_db.writeto(args.root + '{}_{}_{:02}xx_db_cube.fits'.format(args.calibname.replace(" ", ""),
+        #                                                                 args.taskid[:-3],
+        #                                                                 beam), overwrite=True)
+        # hduy_db.writeto(args.root + '{}_{}_{:02}yy_db_cube.fits'.format(args.calibname.replace(" ", ""),
+        #                                                                 args.taskid[:-3],
+        #                                                                 beam), overwrite=True)
+        hdux.writeto(args.root + '{}_{}_{:02}xx.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                             beam), overwrite=True)
+        hduy.writeto(args.root + '{}_{}_{:02}yy.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                             beam), overwrite=True)
+        hduI.writeto(args.root + '{}_{}_{:02}_I.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                             beam), overwrite=True)
+        hdusq.writeto(args.root + '{}_{}_{:02}_diff.fits'.format(args.calibname.replace(" ", ""), args.taskid[:-3],
+                                                                 beam), overwrite=True)
 
 
 if __name__ == '__main__':
