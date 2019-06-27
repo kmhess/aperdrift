@@ -82,7 +82,7 @@ def main():
         wrap = -24 * u.hourangle
 
     print("Starting HA of calibrator is: {}".format(current_lst-drift_cal.ra-wrap))
-    if np.abs((current_lst-drift_cal.ra-wrap).hourangle) > 5.:
+    if np.abs((current_lst-drift_cal.ra-wrap).hourangle) > 6.:
         print("CALIBRATOR IS NOT ACTUALLY UP (but calculations are still right).")
     print("")
 
@@ -181,8 +181,8 @@ def main():
                     date1, time1 = start_obstime_utc.strftime('%Y-%m-%d'), start_obstime_utc.strftime('%H:%M:%S')
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
                     offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
-                    sign = '+' if int(offset) >= 0 else ''
-                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1370\n'.format(calib_name.replace(' ',''), sign, int(offset),
+                    sign = '+' if int(offset) >= 0 else '-'
+                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1280\n'.format(calib_name.replace(' ',''), sign, int(np.abs(offset)),
                                                                         telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
