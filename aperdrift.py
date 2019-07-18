@@ -110,14 +110,17 @@ def main():
         drift_time = []
         # Add drifts at the start
         if n > 1:
-            for i in range(n + 0, 0, -1):  # changed from n-1
-                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n-1) * i)
-                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n-1) * i)
-                # Drift starts at high RA, low HA
+            # for i in range(n + 0, 0, -1):  # changed from n-1
+            #     dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n-1) * i)
+            #     dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n-1) * i)
+            for i in range(n + 2, 0, -1):  # Regular density of scans outside first row
+                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n) * i)
+            # Drift starts at high RA, low HA
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.75) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.5) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.9) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
         # Do drifts for all the beams
         for r in r_nozero[:-1]:
             for i in range(n):
@@ -168,7 +171,7 @@ def main():
             # Open & prepare CSV file to write parset parameters to, in format given by V.M. Moss.
             # Don't worry about slew time because 2 minute wait will always be longer.
             with open(calib_name.replace(' ','') + "_drift" + args.starttime_utc.strftime("%Y%m%d") + args.output + ".csv", "w") as csvfile:
-                csvfile.write('source,ra,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq\n')
+                csvfile.write('source,ra,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq,template\n')
                 for i in range(len(dec_cen)):
                     sidereal_t = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
                     wrap = 0 * u.hourangle
@@ -182,8 +185,9 @@ def main():
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
                     offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
                     sign = '+' if int(offset) >= 0 else '-'
-                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1280\n'.format(calib_name.replace(' ',''), sign, int(np.abs(offset)),
-                                                                        telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
+                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1280,{}\n'.format(calib_name.replace(' ',''),
+                                                        sign, int(np.abs(offset)),telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2,
+                                                        '/opt/apertif/share/parsets/parset_start_observation_atdb_SubbandPhaseCorrection.template'))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
 
