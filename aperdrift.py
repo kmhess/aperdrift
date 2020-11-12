@@ -132,9 +132,9 @@ def main():
                 drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
         # Add drifts at the end
         if n > 1:
-            for i in range(0, n+1):  # changed from n-1
-                dec_row.append(drift_cal.dec.deg + rows[-1][1] - (diff) / (n-1) * i)
-                dec_cen.append(drift_cal.dec.deg - rows[-1][1] + (diff) / (n-1) * i)
+            for i in range(0, n+3):  # changed from n-1
+                dec_row.append(drift_cal.dec.deg + rows[-1][1] - (diff) / (n) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[-1][1] + (diff) / (n) * i)
                 # Drift starts at high RA, low HA
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
@@ -158,15 +158,21 @@ def main():
             ax.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
             ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
                    drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
+            ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
+                   drift_cal.dec.deg + beams['dDec'], s=3000, marker='o', color="none", edgecolors='k')
             ax.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
+            
             for i in range(len(dec_cen)):
                 # ax.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] + 1.2) / np.cos((dec_row[i]) * u.deg)],
                 ax.plot([ra_start[i], ra_start[i] + drift_time[i] / u.min / 60. /12. * 180.],
                         [dec_row[i], dec_row[i]])
+
             xlims = ax.get_xlim()
             plt.xlim(xlims[1]+0.25,xlims[0]-0.25)
+            ax.set_xlabel("RA [deg]", fontsize=20)
+            ax.set_ylabel("DEC [deg]", fontsize=20)
             figfilename = calib_name.replace(' ', '') + '_driftscan.png'
-            plt.savefig(figfilename)
+            plt.savefig(figfilename, dpi=200, bbox_inches='tight')
 
             # Open & prepare CSV file to write parset parameters to, in format given by V.M. Moss.
             # Don't worry about slew time because 2 minute wait will always be longer.
@@ -189,7 +195,12 @@ def main():
                                                         sign, int(np.abs(offset)),telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2,
                                                         '/opt/apertif/share/parsets/parset_start_observation_atdb_SubbandPhaseCorrection.template'))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
+                    
             print(end_obstime_utc)
+            
+
+                
+
 
     # Don't add the last 2 minutes to write out the end time because we don't care about the delay for the data writer.
     print("Assuming {} drifts, ending observations! UTC: {}".format(args.drifts_per_beam,end_obstime_utc))
