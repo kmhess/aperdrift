@@ -2,7 +2,7 @@
 # K.M.Hess 19/02/2019 (hess@astro.rug.nl)
 __author__ = "Kelley M. Hess"
 __date__ = "$28-apr-2019 16:00:00$"
-__version__ = "0.4.1"
+__version__ = "0.5"
 
 import datetime
 
@@ -82,7 +82,7 @@ def main():
         wrap = -24 * u.hourangle
 
     print("Starting HA of calibrator is: {}".format(current_lst-drift_cal.ra-wrap))
-    if np.abs((current_lst-drift_cal.ra-wrap).hourangle) > 5.:
+    if np.abs((current_lst-drift_cal.ra-wrap).hourangle) > 6.:
         print("CALIBRATOR IS NOT ACTUALLY UP (but calculations are still right).")
     print("")
 
@@ -94,8 +94,10 @@ def main():
 
     print("Starting observations! UTC: {}".format(args.starttime_utc))
 
-    # Calculate the starting position of the beams and the length of the drift:
+    # Calculate the starting position of the beams and the length of the drift
+    # (Do for multiple options which will print if ags.verbose = True):
     for n in range(1,5):
+        # Only include explicit drift through beam 0 if only drifting through peak.
         if n > 1:
             r_nozero = np.delete(rows, 3)
         else:
@@ -106,23 +108,38 @@ def main():
         ha_start = []
         ha_end = []
         drift_time = []
+        # Add drifts at the start
         if n > 1:
-            for i in range(n - 1, 0, -1):
-                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / n * i)
-                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / n * i)
-                # Drift starts at high RA, low HA
+            # for i in range(n + 0, 0, -1):  # changed from n-1
+            #     dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n-1) * i)
+            #     dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n-1) * i)
+            for i in range(n + 2, 0, -1):  # Regular density of scans outside first row
+                dec_row.append(drift_cal.dec.deg + rows[0][1] + (diff) / (n) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[0][1] - (diff) / (n) * i)
+            # Drift starts at high RA, low HA
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[0][1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
-        for r in r_nozero:
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.9) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+        # Do drifts for all the beams
+        for r in r_nozero[:-1]:
             for i in range(n):
                 dec_row.append(drift_cal.dec.deg + r[1] - (diff) / n * i)
                 dec_cen.append(drift_cal.dec.deg - r[1] + (diff) / n * i)
                 ha_start.append(np.min(beams[np.where(beams['dDec'] == r[1])]['dHA']))
                 ha_end.append(np.max(beams[np.where(beams['dDec'] == r[1])]['dHA']))
-                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.6) / np.cos(dec_row[-1] * u.deg))
-                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.2) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.9) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
+        # Add drifts at the end
+        if n > 1:
+            for i in range(0, n+1):  # changed from n-1
+                dec_row.append(drift_cal.dec.deg + rows[-1][1] - (diff) / (n-1) * i)
+                dec_cen.append(drift_cal.dec.deg - rows[-1][1] + (diff) / (n-1) * i)
+                # Drift starts at high RA, low HA
+                ha_start.append(np.min(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
+                ha_end.append(np.max(beams[np.where(beams['dDec'] == rows[-1][1])]['dHA']))
+                ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.75) / np.cos(dec_row[-1] * u.deg))
+                drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.5) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
 
         start_pos = SkyCoord(ra=np.array(ra_start), dec=dec_cen, unit='deg')
 
@@ -154,7 +171,7 @@ def main():
             # Open & prepare CSV file to write parset parameters to, in format given by V.M. Moss.
             # Don't worry about slew time because 2 minute wait will always be longer.
             with open(calib_name.replace(' ','') + "_drift" + args.starttime_utc.strftime("%Y%m%d") + args.output + ".csv", "w") as csvfile:
-                csvfile.write('source,ra,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq\n')
+                csvfile.write('source,ra,ha,dec,date1,time1,date2,time2,int,type,weight,beam,switch_type,freqmode,centfreq,template\n')
                 for i in range(len(dec_cen)):
                     sidereal_t = Time(start_obstime_utc).sidereal_time('apparent', westerbork().lon)
                     wrap = 0 * u.hourangle
@@ -167,9 +184,10 @@ def main():
                     date1, time1 = start_obstime_utc.strftime('%Y-%m-%d'), start_obstime_utc.strftime('%H:%M:%S')
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
                     offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
-                    sign = '+' if int(offset) >= 0 else ''
-                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1370\n'.format(calib_name.replace(' ',''), sign, int(offset),
-                                                                        telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2))
+                    sign = '+' if int(offset) >= 0 else '-'
+                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1280,{}\n'.format(calib_name.replace(' ',''),
+                                                        sign, int(np.abs(offset)),telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2,
+                                                        '/opt/apertif/share/parsets/parset_start_observation_atdb_SubbandPhaseCorrection.template'))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
             print(end_obstime_utc)
 
