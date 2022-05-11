@@ -154,23 +154,28 @@ def main():
             print("Total time: {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
 
             # Plot and save the drifts for the one actually requested:
-            fig,ax=plt.subplots(figsize=(9, 6))
+            fig,ax=plt.subplots(figsize=(12, 6))
             ax.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
-            ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
-                   drift_cal.dec.deg + beams['dDec'], s=10, marker='o', facecolor='black')
-            ax.scatter(drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg),
-                   drift_cal.dec.deg + beams['dDec'], s=3000, marker='o', color="none", edgecolors='k')
-            ax.scatter(ra_start, dec_row, s=10, marker='*', facecolor='brown')
+            
+            beam_ra = drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg)
+            beam_dec = drift_cal.dec.deg + beams['dDec']
+            
+            for j in range(len(beams)):
+            	plt.text(beam_ra[j], beam_dec[j], str(j), fontsize=18)
+            	ax.add_patch(plt.Circle((beam_ra[j], beam_dec[j]), 0.3, edgecolor='grey', facecolor='none', alpha=0.5, linewidth=2.5))
+            #ax.scatter(beam_ra, beam_dec, s=6500, marker='o', color="none", edgecolors='grey', alpha=0.5)
+            ax.scatter(ra_start, dec_row, s=20, marker='<', facecolor='grey')
             
             for i in range(len(dec_cen)):
                 # ax.plot([ra_start[i], ra_start[i] + (ha_end[i] - ha_start[i] + 1.2) / np.cos((dec_row[i]) * u.deg)],
                 ax.plot([ra_start[i], ra_start[i] + drift_time[i] / u.min / 60. /12. * 180.],
-                        [dec_row[i], dec_row[i]])
+                        [dec_row[i], dec_row[i]], color='C0', alpha=0.5)
 
             xlims = ax.get_xlim()
             plt.xlim(xlims[1]+0.25,xlims[0]-0.25)
             ax.set_xlabel("RA [deg]", fontsize=20)
             ax.set_ylabel("DEC [deg]", fontsize=20)
+            ax.tick_params(axis='both', which='major', labelsize=15)
             figfilename = calib_name.replace(' ', '') + '_driftscan.png'
             plt.savefig(figfilename, dpi=200, bbox_inches='tight')
 
@@ -191,7 +196,7 @@ def main():
                     date2, time2 = end_obstime_utc.strftime('%Y-%m-%d'), end_obstime_utc.strftime('%H:%M:%S')
                     offset = (drift_cal.dec.deg - dec_cen[i]) * 60.     # units in arcmins
                     sign = '+' if int(offset) >= 0 else '-'
-                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1280,{}\n'.format(calib_name.replace(' ',''),
+                    csvfile.write('{}drift{}{:02},,{:.6f},{:.6f},{},{},{},{},10,T,compound,0,system,300,1370,{}\n'.format(calib_name.replace(' ',''),
                                                         sign, int(np.abs(offset)),telescope_position_hadec.deg, dec_cen[i], date1, time1, date2, time2,
                                                         '/opt/apertif/share/parsets/parset_start_observation_atdb_SubbandPhaseCorrection.template'))
                     start_obstime_utc = end_obstime_utc + datetime.timedelta(minutes=2.0)
