@@ -14,7 +14,7 @@ modules/__pycache__
 .DS_Store
 .idea/
 *.log
-modeling/*/
+modeling/
 modeling/*ipynb
 modeling/*fits
 modeling/*last
