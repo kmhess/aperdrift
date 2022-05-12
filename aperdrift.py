@@ -96,7 +96,7 @@ def main():
 
     # Calculate the starting position of the beams and the length of the drift
     # (Do for multiple options which will print if ags.verbose = True):
-    for n in range(1,5):
+    for n in range(1, 5):
         # Only include explicit drift through beam 0 if only drifting through peak.
         if n > 1:
             r_nozero = np.delete(rows, 3)
@@ -131,6 +131,14 @@ def main():
                 ra_start.append(drift_cal.ra.deg + (ha_start[-1] - 0.9) / np.cos(dec_row[-1] * u.deg))
                 drift_time.append((np.abs(ha_end[-1] - ha_start[-1] + 1.8) / np.cos((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
         # Add drifts at the end
+        if n == 1:
+            dec_row.append (drift_cal.dec.deg + rows[-1][1] - (diff) / (n) * i)
+            dec_cen.append (drift_cal.dec.deg - rows[-1][1] + (diff) / (n) * i)
+            # Drift starts at high RA, low HA
+            ha_start.append (np.min (beams[np.where (beams['dDec'] == rows[-1][1])]['dHA']))
+            ha_end.append (np.max (beams[np.where (beams['dDec'] == rows[-1][1])]['dHA']))
+            ra_start.append (drift_cal.ra.deg + (ha_start[-1] - 0.75) / np.cos (dec_row[-1] * u.deg))
+            drift_time.append ((np.abs (ha_end[-1] - ha_start[-1] + 1.5) / np.cos ((dec_row[-1]) * u.deg)) * 12. / 180. * 60. * u.min)
         if n > 1:
             for i in range(0, n+3):  # changed from n-1
                 dec_row.append(drift_cal.dec.deg + rows[-1][1] - (diff) / (n) * i)
@@ -154,15 +162,15 @@ def main():
             print("Total time: {}.\n".format(np.ceil(sum(drift_time) + 2. * (len(drift_time)-1) * u.min)))
 
             # Plot and save the drifts for the one actually requested:
-            fig,ax=plt.subplots(figsize=(12, 6))
+            fig, ax = plt.subplots(figsize=(12, 6))
             ax.scatter(drift_cal.ra.deg, drift_cal.dec.deg, c='red', s=20)
             
             beam_ra = drift_cal.ra.deg + beams['dHA'] / np.cos((drift_cal.dec.deg + beams['dDec']) * u.deg)
             beam_dec = drift_cal.dec.deg + beams['dDec']
             
             for j in range(len(beams)):
-            	plt.text(beam_ra[j], beam_dec[j], str(j), fontsize=18)
-            	ax.add_patch(plt.Circle((beam_ra[j], beam_dec[j]), 0.3, edgecolor='grey', facecolor='none', alpha=0.5, linewidth=2.5))
+                plt.text(beam_ra[j], beam_dec[j], str(j), fontsize=18)
+                ax.add_patch(plt.Circle((beam_ra[j], beam_dec[j]), 0.3, edgecolor='grey', facecolor='none', alpha=0.5, linewidth=2.5))
             #ax.scatter(beam_ra, beam_dec, s=6500, marker='o', color="none", edgecolors='grey', alpha=0.5)
             ax.scatter(ra_start, dec_row, s=20, marker='<', facecolor='grey')
             
