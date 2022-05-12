@@ -1,0 +1,6 @@
+astropy==5.0.1
+matplotlib==3.4.1
+numpy==1.20.3
+pandas==1.4.0
+scipy==1.6.2
+tasks==2.8.0
