@@ -1,5 +1,6 @@
 aperdrift
 ===========
+[![DOI](https://zenodo.org/badge/182954402.svg)](https://zenodo.org/badge/latestdoi/182954402)
 
 Introduction
 ------------
@@ -7,7 +8,8 @@ Python code to generate a schedule for Apertif driftscans.
 
 The program reads the Apertif beam pattern from a .txt file in ancillary/ and creates a drift scan schedule for a user specified calibrator and time**, and user specified number of drifts per beam***.
 
-The properties of the Apertif beams derived from driftscans are described in an upcoming paper: Dénes, Hess, et al (in prep).
+The properties of the Apertif beams derived from driftscans are described in an upcoming paper: \
+Dénes, Hess, et al (in prep) "Characterising the Apertif primary beam response".
 
 The code used for modeling the Apertif compound beams from the driftscan autocorrelations can be found [here](https://github.com/helgadenes/aperPB). 
 
@@ -75,6 +77,9 @@ Kelley M. Hess and Helga Dénes
 
 Copyright and license
 ---------------------
+
+© 2022 Kelley M. Hess
+
 This programme is free software: you can redistribute it and/or modify it 
 under the terms of the GNU General Public License as published by the Free 
 Software Foundation, either version 3 of the License, or (at your option) any 
