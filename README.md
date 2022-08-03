@@ -1,6 +1,7 @@
 aperdrift
 ===========
-[![DOI](https://zenodo.org/badge/182954402.svg)](https://zenodo.org/badge/latestdoi/182954402)
+[![DOI](https://zenodo.org/badge/182954402.svg)](https://zenodo.org/badge/latestdoi/182954402) \
+2 Aug 22: [Dénes et al.](https://arxiv.org/abs/2205.09662) has been accepted for publication in A&A.
 
 Introduction
 ------------
@@ -8,8 +9,8 @@ Python code to generate a schedule for Apertif driftscans.
 
 The program reads the Apertif beam pattern from a .txt file in ancillary/ and creates a drift scan schedule for a user specified calibrator and time**, and user specified number of drifts per beam***.
 
-The properties of the Apertif beams derived from driftscans are described in an upcoming paper: \
-Dénes, Hess, et al (in prep) "Characterising the Apertif primary beam response".
+The properties of the Apertif beams derived from driftscans are described in: \
+[Dénes, H., Hess, K. M., Adams, E. A. K., et al., "Characterising the Apertif primary beam response", accepted to A&A](https://arxiv.org/abs/2205.09662)
 
 The code used for modeling the Apertif compound beams from the driftscan autocorrelations can be found [here](https://github.com/helgadenes/aperPB). 
 
@@ -74,6 +75,11 @@ Version history
 Authors
 -------
 Kelley M. Hess and Helga Dénes
+
+Reference
+---------
+When referring to aperdrift in publications, please cite both the Zenodo DOI for the code, and the following paper: \
+[Dénes, H., Hess, K. M., Adams, E. A. K., et al., "Characterising the Apertif primary beam response", accepted to A&A](https://arxiv.org/abs/2205.09662)
 
 Copyright and license
 ---------------------
